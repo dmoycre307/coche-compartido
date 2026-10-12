@@ -136,9 +136,14 @@
 
     const Toast = ({ message }) => {
       if (!message) return null;
+      const isUrgent = message.includes('🚨') || message.includes('⚠️');
       return (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-sky-600 text-white font-semibold text-xs px-4 py-2.5 rounded-full shadow-2xl animate-bounce flex items-center gap-2 border border-sky-400/60 backdrop-blur-md">
-          <i className="fa-solid fa-circle-info text-sky-200"></i>
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 font-semibold text-xs px-4 py-2.5 rounded-full shadow-2xl animate-bounce flex items-center gap-2 border backdrop-blur-md ${
+          isUrgent 
+            ? 'bg-rose-600/90 text-white border-rose-400' 
+            : 'bg-sky-600/90 text-white border-sky-400/60'
+        }`}>
+          <i className={`fa-solid ${isUrgent ? 'fa-triangle-exclamation text-rose-200' : 'fa-circle-info text-sky-200'}`}></i>
           <span>{message}</span>
         </div>
       );
@@ -195,6 +200,7 @@
             <button
               onClick={onShare}
               className="px-2.5 py-1.5 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-600/30 transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
+              title="Compartir saldos por WhatsApp"
             >
               <i className="fa-brands fa-whatsapp text-sm"></i>
               <span>Compartir</span>
@@ -753,7 +759,7 @@
                       <button
                         onClick={() => onDeleteMember(m.id, m.name)}
                         className="text-slate-500 hover:text-rose-400 p-2 text-xs transition-colors"
-                        title="Eliminar del grupo"
+                        title="Eliminar del grupo (Requiere PIN Master)"
                       >
                         <i className="fa-solid fa-trash-can"></i>
                       </button>
@@ -767,7 +773,7 @@
       );
     };
 
-    const HistoryTab = ({ trips, isMasterUnlocked, onRequestDeleteTrip, onExportCSV }) => {
+    const HistoryTab = ({ trips, onRequestDeleteTrip, onExportCSV, onShareWhatsApp }) => {
       return (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -775,52 +781,64 @@
               <i className="fa-solid fa-clock-rotate-left text-sky-400"></i>
               Historial de Trayectos ({trips.length})
             </h2>
-            <button
-              onClick={onExportCSV}
-              className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 transition-all"
-            >
-              <i className="fa-solid fa-file-csv"></i> Exportar CSV Excel
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onShareWhatsApp('history')}
+                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 transition-all"
+                title="Compartir historial por WhatsApp"
+              >
+                <i className="fa-brands fa-whatsapp text-xs"></i> WhatsApp
+              </button>
+              <button
+                onClick={onExportCSV}
+                className="text-[10px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 bg-sky-500/10 px-2 py-1 rounded-lg border border-sky-500/20 transition-all"
+                title="Descargar archivo CSV Excel"
+              >
+                <i className="fa-solid fa-file-csv"></i> Excel (CSV)
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">
-            {trips.map(t => {
-              const passCount = (t.passengers || []).length;
-              return (
-                <div key={t.id} className="bg-slate-900 rounded-xl p-3 border border-slate-800/80 flex items-center justify-between gap-3 shadow-sm">
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        t.section === 'Ida' ? 'bg-sky-500/20 text-sky-300' : 'bg-amber-500/20 text-amber-300'
-                      }`}>
-                        {t.section === 'Ida' ? '🌅 Ida' : '🌆 Vuelta'}
-                      </span>
-                      <span className="text-xs font-semibold text-slate-300">{t.date}</span>
+            {trips.length === 0 ? (
+              <div className="p-4 bg-slate-900 rounded-xl text-center text-xs text-slate-500 border border-slate-800">
+                Aún no hay trayectos registrados.
+              </div>
+            ) : (
+              trips.map(t => {
+                const passCount = (t.passengers || []).length;
+                return (
+                  <div key={t.id} className="bg-slate-900 rounded-xl p-3 border border-slate-800/80 flex items-center justify-between gap-3 shadow-sm">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          t.section === 'Ida' ? 'bg-sky-500/20 text-sky-300' : 'bg-amber-500/20 text-amber-300'
+                        }`}>
+                          {t.section === 'Ida' ? '🌅 Ida' : '🌆 Vuelta'}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-300">{t.date}</span>
+                      </div>
+
+                      <div className="text-xs text-slate-200">
+                        Conductor: <span className="font-bold text-sky-400">{t.driver}</span> (+{passCount} pts)
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        Pasajeros: {(t.passengers || []).join(', ')}
+                      </div>
                     </div>
 
-                    <div className="text-xs text-slate-200">
-                      Conductor: <span className="font-bold text-sky-400">{t.driver}</span> (+{passCount} pts)
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      Pasajeros: {(t.passengers || []).join(', ')}
-                    </div>
+                    <button
+                      onClick={() => onRequestDeleteTrip(t.id)}
+                      className="p-2 rounded-lg text-xs transition-all flex items-center gap-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10"
+                      title="Borrar trayecto (Requiere PIN Master)"
+                    >
+                      <i className="fa-solid fa-lock text-[10px] text-amber-400"></i>
+                      <i className="fa-solid fa-trash-can"></i>
+                    </button>
                   </div>
-
-                  <button
-                    onClick={() => onRequestDeleteTrip(t.id)}
-                    className={`p-2 rounded-lg text-xs transition-all flex items-center gap-1 ${
-                      isMasterUnlocked
-                        ? 'text-rose-400 hover:bg-rose-500/20'
-                        : 'text-slate-500 hover:text-amber-400 hover:bg-amber-500/10'
-                    }`}
-                    title={isMasterUnlocked ? "Eliminar trayecto" : "Requiere PIN Master para borrar"}
-                  >
-                    {!isMasterUnlocked && <i className="fa-solid fa-lock text-[10px] text-amber-400"></i>}
-                    <i className="fa-solid fa-trash-can"></i>
-                  </button>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       );
@@ -848,13 +866,18 @@
       isMasterUnlocked,
       onToggleMaster,
       masterPin,
+      onRequestResetPin,
       newPinInput,
       setNewPinInput,
       onChangeMasterPin,
       onExportCSV,
-      onCopyWhatsApp,
+      onExportJSON,
+      onImportJSON,
+      onShareWhatsApp,
       onRequestReset
     }) => {
+      const fileInputRef = useRef(null);
+
       return (
         <div className="space-y-4">
           <div className="flex bg-slate-900/90 p-1 rounded-2xl border border-slate-800 shadow-lg gap-1">
@@ -935,12 +958,12 @@
                       ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                       : 'bg-slate-800 text-slate-400 border-slate-700'
                   }`}>
-                    {syncStatus === 'connected' ? '● En línea (Sincronizado)' : syncStatus === 'connecting' ? '🟡 Conectando...' : '○ Modo Local'}
+                    {syncStatus === 'connected' ? '● En línea' : syncStatus === 'connecting' ? '🟡 Conectando...' : '○ Modo Local'}
                   </span>
                 </h2>
 
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Escribe el <strong>mismo código de grupo</strong> en los móviles de todos tus compañeros. Cualquier trayecto o cambio se actualizará en sus pantallas en tiempo real.
+                  Escribe el <strong>mismo código de grupo</strong> en los móviles de todos tus compañeros. Cualquier trayecto o cambio se actualizará en sus pantallas al instante.
                 </p>
 
                 <div className="space-y-2">
@@ -964,31 +987,166 @@
                 </div>
               </div>
 
+              {/* Enhanced Export and Share Data Module */}
+              <div className="bg-slate-900 rounded-2xl p-4 border border-emerald-500/30 shadow-md space-y-4">
+                <div className="border-b border-slate-800/80 pb-2.5">
+                  <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <i className="fa-solid fa-share-nodes text-emerald-400"></i>
+                    <span>Exportar y Compartir Datos</span>
+                  </h2>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Comparte información con tu grupo, exporta informes a Excel o realiza copias de seguridad de tus datos.
+                  </p>
+                </div>
+
+                {/* Section 1: WhatsApp Sharing */}
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                    <i className="fa-brands fa-whatsapp"></i>
+                    <span>1. Enviar por WhatsApp / Chat</span>
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      onClick={() => onShareWhatsApp('balance')}
+                      className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition-all active:scale-98 flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-scale-balanced text-emerald-400 text-sm"></i>
+                      <div>
+                        <div className="text-xs font-bold text-slate-200">Saldos de Puntos</div>
+                        <div className="text-[10px] text-slate-400">Puntos + Quién conduce</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => onShareWhatsApp('agenda')}
+                      className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition-all active:scale-98 flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-calendar-week text-sky-400 text-sm"></i>
+                      <div>
+                        <div className="text-xs font-bold text-slate-200">Agenda Semanal</div>
+                        <div className="text-[10px] text-slate-400">Cochedía por día</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => onShareWhatsApp('history')}
+                      className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition-all active:scale-98 flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-clock-rotate-left text-amber-400 text-sm"></i>
+                      <div>
+                        <div className="text-xs font-bold text-slate-200">Últimos Viajes</div>
+                        <div className="text-[10px] text-slate-400">Historial reciente</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section 2: CSV Export */}
+                <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                  <span className="text-xs font-bold text-sky-400 flex items-center gap-1.5">
+                    <i className="fa-solid fa-file-csv"></i>
+                    <span>2. Informe Excel / Google Sheets</span>
+                  </span>
+                  <button
+                    onClick={onExportCSV}
+                    className="w-full p-2.5 bg-slate-950 hover:bg-slate-800/90 border border-sky-500/30 rounded-xl text-left transition-all active:scale-98 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center text-sm">
+                        <i className="fa-solid fa-table"></i>
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-200">Descargar Informe CSV Completo</div>
+                        <div className="text-[10px] text-slate-400">Incluye saldos, estadísticas individuales e historial detallado</div>
+                      </div>
+                    </div>
+                    <i className="fa-solid fa-download text-sky-400 text-xs"></i>
+                  </button>
+                </div>
+
+                {/* Section 3: Backup JSON Export / Import */}
+                <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                  <span className="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                    <i className="fa-solid fa-floppy-disk"></i>
+                    <span>3. Copia de Seguridad Completa (Backup JSON)</span>
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={onExportJSON}
+                      className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition-all active:scale-98 flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-file-export text-purple-400 text-sm"></i>
+                      <div>
+                        <div className="text-xs font-bold text-slate-200">Guardar Backup</div>
+                        <div className="text-[10px] text-slate-400">Descargar .JSON</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                      className="p-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-left transition-all active:scale-98 flex items-center gap-2"
+                    >
+                      <i className="fa-solid fa-file-import text-purple-400 text-sm"></i>
+                      <div>
+                        <div className="text-xs font-bold text-slate-200">Restaurar Backup</div>
+                        <div className="text-[10px] text-slate-400">Cargar .JSON</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={onImportJSON}
+                    accept=".json"
+                    className="hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Security & PIN Section */}
               <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-md space-y-3">
                 <h2 className="text-sm font-bold text-slate-100 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                   <span className="flex items-center gap-2">
                     <i className="fa-solid fa-shield-halved text-amber-400"></i>
                     Seguridad y PIN Master
                   </span>
-                  <button
-                    type="button"
-                    onClick={onToggleMaster}
-                    className={`text-[10px] px-2 py-1 rounded-lg border font-bold transition-all ${
-                      isMasterUnlocked
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                        : 'bg-slate-800 text-slate-400 border-slate-700/80 hover:text-slate-200'
-                    }`}
-                  >
-                    {isMasterUnlocked ? '🔓 Desbloqueado' : '🔒 Bloqueado'}
-                  </button>
+                  <span className="text-[10px] bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold">
+                    1 Uso Por Acción
+                  </span>
                 </h2>
 
+                <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800/80 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 font-medium">Estado del PIN:</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-mono font-bold border ${
+                      masterPin === '1234'
+                        ? 'bg-slate-800 text-slate-300 border-slate-700'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    }`}>
+                      {masterPin === '1234' ? 'Predeterminado' : 'Personalizado'}
+                    </span>
+                  </div>
+
+                  {masterPin !== '1234' && (
+                    <button
+                      type="button"
+                      onClick={onRequestResetPin}
+                      className="text-[11px] bg-slate-800 hover:bg-slate-700 text-amber-300 px-2.5 py-1 rounded-lg border border-slate-700 transition-all font-semibold active:scale-95 flex items-center gap-1"
+                    >
+                      <i className="fa-solid fa-rotate-left text-[10px]"></i>
+                      <span>Restablecer</span>
+                    </button>
+                  )}
+                </div>
+
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  El PIN Master protege acciones sensibles como eliminar registros, borrar compañeros del grupo o reiniciar datos.
+                  El Administrador ingresa este PIN únicamente para autorizar acciones delicadas (como borrar registros o reiniciar datos). La app se <strong>re-bloquea automáticamente</strong> tras completar la acción.
                 </p>
 
                 <form onSubmit={onChangeMasterPin} className="space-y-2 pt-1">
-                  <label className="block text-[11px] font-semibold text-slate-400">Cambiar PIN Master (Actual: {masterPin}):</label>
+                  <label className="block text-[11px] font-semibold text-slate-400">Cambiar PIN Master (Solo Admin):</label>
                   <div className="flex gap-2">
                     <input
                       type="password"
@@ -1004,37 +1162,7 @@
                 </form>
               </div>
 
-              <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-md space-y-3">
-                <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
-                  <i className="fa-solid fa-file-export text-emerald-400"></i>
-                  Exportar y Compartir Datos
-                </h2>
-
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
-                    onClick={onExportCSV}
-                    className="p-3 bg-slate-950 hover:bg-slate-800/80 border border-slate-800/80 rounded-xl text-left space-y-1 transition-all active:scale-98"
-                  >
-                    <div className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
-                      <i className="fa-solid fa-file-csv"></i>
-                      <span>Exportar CSV</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400">Para abrir en Excel o Google Sheets</div>
-                  </button>
-
-                  <button
-                    onClick={onCopyWhatsApp}
-                    className="p-3 bg-slate-950 hover:bg-slate-800/80 border border-slate-800/80 rounded-xl text-left space-y-1 transition-all active:scale-98"
-                  >
-                    <div className="text-emerald-400 font-bold text-xs flex items-center gap-1.5">
-                      <i className="fa-brands fa-whatsapp"></i>
-                      <span>Copia WhatsApp</span>
-                    </div>
-                    <div className="text-[10px] text-slate-400">Resumen para pegar en el chat</div>
-                  </button>
-                </div>
-              </div>
-
+              {/* Reset Section */}
               <div className="bg-slate-900 rounded-2xl p-4 border border-rose-500/30 shadow-md space-y-3">
                 <h2 className="text-sm font-bold text-rose-400 flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
                   <i className="fa-solid fa-rotate-left"></i>
@@ -1042,7 +1170,7 @@
                 </h2>
 
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Si deseas volver a los valores predeterminados de la plantilla, puedes reiniciar la aplicación aquí.
+                  Si deseas volver a los valores predeterminados de la plantilla, puedes reiniciar la aplicación aquí. Se requiere PIN Master y escribir la palabra <strong>REINICIAR</strong>.
                 </p>
 
                 <button
@@ -1061,6 +1189,7 @@
 
     const MasterModal = ({ show, inputPin, setInputPin, pinError, onVerify, onClose }) => {
       if (!show) return null;
+
       return (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-5 max-w-xs w-full space-y-4 shadow-2xl">
@@ -1068,20 +1197,26 @@
               <div className="w-12 h-12 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
                 <i className="fa-solid fa-shield-halved"></i>
               </div>
-              <h3 className="font-bold text-base text-slate-100">Modo MASTER</h3>
-              <p className="text-xs text-slate-400">Introduce el PIN de seguridad para continuar.</p>
+              <h3 className="font-bold text-base text-slate-100">Autorización MASTER</h3>
+              <p className="text-xs text-slate-400">
+                Introduce el PIN del Administrador para realizar esta acción.
+              </p>
             </div>
 
             <form onSubmit={onVerify} className="space-y-3">
-              <input
-                type="password"
-                placeholder="PIN (por defecto 1234)..."
-                value={inputPin}
-                onChange={(e) => setInputPin(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-center font-mono text-lg text-amber-300 focus:outline-none focus:border-amber-500"
-                autoFocus
-              />
-              {pinError && <p className="text-[11px] text-rose-400 text-center font-semibold">{pinError}</p>}
+              <div>
+                <input
+                  type="password"
+                  value={inputPin}
+                  onChange={(e) => setInputPin(e.target.value)}
+                  placeholder="PIN Master..."
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-center font-mono text-base text-amber-300 focus:outline-none focus:border-amber-500 tracking-widest"
+                  autoFocus
+                />
+                {pinError && (
+                  <p className="text-[11px] text-rose-400 text-center font-semibold mt-1.5">{pinError}</p>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
@@ -1093,9 +1228,9 @@
                 </button>
                 <button
                   type="submit"
-                  className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-lg transition-all"
+                  className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-xl transition-all shadow-lg active:scale-95"
                 >
-                  Verificar
+                  Autorizar
                 </button>
               </div>
             </form>
@@ -1104,29 +1239,98 @@
       );
     };
 
-    const ResetModal = ({ show, onConfirm, onClose }) => {
+    const ResetPinModal = ({ show, onConfirm, onClose }) => {
       if (!show) return null;
+
       return (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-rose-500/40 rounded-2xl p-5 max-w-xs w-full space-y-4 shadow-2xl">
+          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-5 max-w-xs w-full space-y-4 shadow-2xl">
             <div className="text-center space-y-1">
-              <div className="w-12 h-12 bg-rose-500/20 border border-rose-500/40 text-rose-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
+              <div className="w-12 h-12 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
                 <i className="fa-solid fa-rotate-left"></i>
               </div>
-              <h3 className="font-bold text-base text-slate-100">¿Restablecer Aplicación?</h3>
-              <p className="text-xs text-slate-400">Se restaurarán los integrantes, rutinas y datos por defecto del grupo.</p>
+              <h3 className="font-bold text-base text-slate-100">¿Restablecer PIN Master?</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                El PIN de Administrador volverá a su valor predeterminado (<strong className="text-amber-300 font-mono">1234</strong>).
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-1">
               <button
+                type="button"
                 onClick={onClose}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs py-2.5 rounded-xl transition-all"
               >
                 Cancelar
               </button>
               <button
+                type="button"
                 onClick={onConfirm}
-                className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs py-2.5 rounded-xl shadow-lg transition-all"
+                className="bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-xl transition-all shadow-lg active:scale-95"
+              >
+                Sí, Restablecer
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const ResetModal = ({ show, onConfirm, onClose }) => {
+      const [confirmText, setConfirmText] = useState('');
+
+      useEffect(() => {
+        if (show) setConfirmText('');
+      }, [show]);
+
+      if (!show) return null;
+
+      const isMatch = confirmText.trim().toUpperCase() === 'REINICIAR';
+
+      return (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-rose-500/40 rounded-2xl p-5 max-w-xs w-full space-y-4 shadow-2xl">
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-rose-500/20 border border-rose-500/40 text-rose-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
+                <i className="fa-solid fa-triangle-exclamation"></i>
+              </div>
+              <h3 className="font-bold text-base text-slate-100">¿Restablecer Aplicación?</h3>
+              <p className="text-xs text-slate-400">
+                Esta acción es irreversible y borrará el historial para restaurar la app a su estado inicial.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[11px] font-medium text-slate-300 text-center">
+                Escribe <span className="font-bold text-rose-400">REINICIAR</span> para confirmar:
+              </label>
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="REINICIAR"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-center font-mono text-sm uppercase text-rose-300 focus:outline-none focus:border-rose-500"
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs py-2.5 rounded-xl transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!isMatch}
+                onClick={onConfirm}
+                className={`font-bold text-xs py-2.5 rounded-xl transition-all shadow-lg ${
+                  isMatch
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer active:scale-95'
+                    : 'bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed opacity-60'
+                }`}
               >
                 Sí, Restablecer
               </button>
@@ -1197,14 +1401,20 @@
       const [selectedDaySuggestion, setSelectedDaySuggestion] = useState(getTodayName());
       const [selectedSectionSuggestion, setSelectedSectionSuggestion] = useState('Ida');
 
-      // Security / Admin
+      // Security / Admin State
       const [masterPin, setMasterPin] = useState(() => {
         return localStorage.getItem('coche_master_pin') || '1234';
       });
       const [isMasterUnlocked, setIsMasterUnlocked] = useState(false);
       const [showMasterModal, setShowMasterModal] = useState(false);
+      const [showResetPinModal, setShowResetPinModal] = useState(false);
       const [showResetModal, setShowResetModal] = useState(false);
+      
+      // Pending actions to execute after single PIN authorization
       const [pendingTripToDelete, setPendingTripToDelete] = useState(null);
+      const [pendingMemberToDelete, setPendingMemberToDelete] = useState(null);
+      const [pendingReset, setPendingReset] = useState(false);
+
       const [inputPin, setInputPin] = useState('');
       const [pinError, setPinError] = useState('');
       const [newPinInput, setNewPinInput] = useState('');
@@ -1242,7 +1452,7 @@
 
       const showToast = (msg) => {
         setToast(msg);
-        setTimeout(() => setToast(null), 3200);
+        setTimeout(() => setToast(null), 4000);
       };
 
       // Save to localStorage
@@ -1272,7 +1482,6 @@
             mqttClientRef.current.end(true);
           }
 
-          // Connecting to public SSL MQTT broker
           const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
             clientId,
             clean: true,
@@ -1286,7 +1495,6 @@
             setSyncStatus('connected');
             client.subscribe(topic, { qos: 1 });
             
-            // Ask existing connected clients for their current state
             client.publish(topic, JSON.stringify({
               type: 'REQUEST_SYNC',
               senderId: clientId
@@ -1345,12 +1553,10 @@
         const t = updatedTrips || trips;
         const r = updatedRoutines || weeklyRoutines;
 
-        // Save locally
         localStorage.setItem('coche_members_v6', JSON.stringify(m));
         localStorage.setItem('coche_trips_v6', JSON.stringify(t));
         localStorage.setItem('coche_weekly_routines_v7', JSON.stringify(r));
 
-        // Broadcast change over WebSocket MQTT
         const client = mqttClientRef.current;
         if (client && client.connected && groupCode) {
           const cleanCode = groupCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
@@ -1365,6 +1571,13 @@
             timestamp: Date.now()
           }), { qos: 1 });
         }
+      };
+
+      const handleConfirmResetMasterPin = () => {
+        setMasterPin('1234');
+        localStorage.setItem('coche_master_pin', '1234');
+        setShowResetPinModal(false);
+        showToast("🔑 PIN Master restablecido a 1234");
       };
 
       useEffect(() => {
@@ -1527,15 +1740,20 @@
       };
 
       const handleDeleteMember = (memberId, memberName) => {
-        if (!isMasterUnlocked) {
-          showToast("🔒 Requiere PIN MASTER para eliminar compañeros");
+        if (isMasterUnlocked) {
+          const updated = members.filter(m => m.id !== memberId);
+          setMembers(updated);
+          pushToCloud(updated, trips, weeklyRoutines);
+          setIsMasterUnlocked(false);
+          showToast(`🗑️ ${memberName} eliminado (Modo Master bloqueado)`);
+        } else {
+          setPendingMemberToDelete({ id: memberId, name: memberName });
+          setPendingTripToDelete(null);
+          setPendingReset(false);
+          setInputPin('');
+          setPinError('');
           setShowMasterModal(true);
-          return;
         }
-        const updated = members.filter(m => m.id !== memberId);
-        setMembers(updated);
-        pushToCloud(updated, trips, weeklyRoutines);
-        showToast(`🗑️ ${memberName} eliminado del grupo`);
       };
 
       const handleDriverChange = (newDriver) => {
@@ -1582,6 +1800,8 @@
           handleDeleteTrip(tripId);
         } else {
           setPendingTripToDelete(tripId);
+          setPendingMemberToDelete(null);
+          setPendingReset(false);
           setInputPin('');
           setPinError('');
           setShowMasterModal(true);
@@ -1591,13 +1811,27 @@
       const handleVerifyMasterPin = (e) => {
         e.preventDefault();
         if (inputPin === masterPin) {
-          setIsMasterUnlocked(true);
           setShowMasterModal(false);
           setPinError('');
-          showToast("🔓 Modo MASTER activado");
+          
           if (pendingTripToDelete) {
             handleDeleteTrip(pendingTripToDelete);
             setPendingTripToDelete(null);
+          } else if (pendingMemberToDelete) {
+            const { id, name } = pendingMemberToDelete;
+            setPendingMemberToDelete(null);
+            const updated = members.filter(m => m.id !== id);
+            setMembers(updated);
+            pushToCloud(updated, trips, weeklyRoutines);
+            setIsMasterUnlocked(false);
+            showToast(`🗑️ ${name} eliminado (Modo Master rebloqueado)`);
+          } else if (pendingReset) {
+            setPendingReset(false);
+            setIsMasterUnlocked(true);
+            setShowResetModal(true);
+          } else {
+            setIsMasterUnlocked(true);
+            showToast("🔓 Modo MASTER activado (se rebloqueará tras 1 acción)");
           }
         } else {
           setPinError("❌ PIN incorrecto.");
@@ -1613,14 +1847,16 @@
         }
         setMasterPin(cleanPin);
         setNewPinInput('');
-        showToast("🔑 Nuevo PIN MASTER guardado correctamente");
+        setIsMasterUnlocked(false);
+        showToast("🔑 Nuevo PIN MASTER guardado y rebloqueado");
       };
 
       const handleDeleteTrip = (id) => {
         const updated = trips.filter(t => t.id !== id);
         setTrips(updated);
-        pushToCloud(members, updated, weeklyRoutines);
-        showToast("🗑️ Trayecto eliminado");
+        pushToCloud(updated, trips, weeklyRoutines);
+        setIsMasterUnlocked(false);
+        showToast("🗑️ Trayecto eliminado (Modo Master rebloqueado)");
       };
 
       const handleConnectGroup = () => {
@@ -1638,13 +1874,15 @@
         setWeeklyRoutines(INITIAL_ROUTINES);
         pushToCloud(INITIAL_MEMBERS, INITIAL_TRIPS, INITIAL_ROUTINES);
         setShowResetModal(false);
+        setIsMasterUnlocked(false);
         showToast("🔄 Datos reiniciados a los valores originales");
       };
 
       const exportToCSV = () => {
-        let csvContent = "\uFEFF";
-        csvContent += "RESUMEN DE TURNOS Y PUNTOS\n";
-        csvContent += "Nombre,Estado,Puntos Turno,Viajes Como Conductor,Viajes Como Pasajero\n";
+        let csvContent = "\uFEFF"; // UTF-8 BOM for Microsoft Excel compatibility
+        csvContent += "RESUMEN DE TURNOS Y PUNTOS - COCHE COMPARTIDO\n";
+        csvContent += `Grupo: "${groupCode}" | Fecha Informe: "${new Date().toLocaleDateString('es-ES')}"\n\n`;
+        csvContent += "Nombre,Estado,Puntos Totales,Viajes Conductor,Viajes Pasajero\n";
         
         members.forEach(m => {
           const score = stats.balance[m.name] || 0;
@@ -1670,31 +1908,116 @@
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        showToast("📊 Informe descargado correctamente para Excel");
+        showToast("📊 Informe descargado en CSV para Excel / Sheets");
       };
 
-      const copyWhatsAppSummary = () => {
-        let msg = `🚗 *CONTROL COCHE COMPARTIDO*\n`;
-        msg += `Grupo: *${groupCode}*\n\n`;
-        
-        members.forEach(m => {
-          const score = stats.balance[m.name] || 0;
-          const status = score >= 0 ? `+${score}` : `${score}`;
-          const stateIcon = m.active ? '🟢' : '⏸️ (Pausado)';
-          msg += `${stateIcon} *${m.name}*: ${status} pts (Puso coche ${stats.drivenCounts[m.name] || 0} veces)\n`;
-        });
+      const exportToJSON = () => {
+        const backupData = {
+          version: '2.0',
+          exportedAt: new Date().toISOString(),
+          groupCode: groupCode,
+          members: members,
+          trips: trips,
+          weeklyRoutines: weeklyRoutines
+        };
 
-        const textArea = document.createElement("textarea");
-        textArea.value = msg;
-        document.body.appendChild(textArea);
-        textArea.select();
-        try {
-          document.execCommand('copy');
-          showToast("📋 Resumen copiado. ¡Pégalo en WhatsApp!");
-        } catch (err) {
-          showToast("⚠️ No se pudo copiar automáticamente");
+        const jsonStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `Backup_CocheCompartido_${groupCode}_${new Date().toISOString().split('T')[0]}.json`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast("💾 Copia de seguridad JSON guardada");
+      };
+
+      const importFromJSON = (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = JSON.parse(e.target.result);
+            if (data.members && data.trips && data.weeklyRoutines) {
+              setMembers(data.members);
+              setTrips(data.trips);
+              setWeeklyRoutines(data.weeklyRoutines);
+              if (data.groupCode) setGroupCode(data.groupCode);
+
+              pushToCloud(data.members, data.trips, data.weeklyRoutines);
+              showToast("📥 Backup restaurado correctamente");
+            } else {
+              showToast("⚠️ El archivo JSON no tiene un formato válido");
+            }
+          } catch (err) {
+            showToast("❌ Error al leer el archivo JSON");
+          }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+      };
+
+      const shareViaWhatsApp = (type = 'balance') => {
+        let text = '';
+
+        if (type === 'balance') {
+          text = `🚗 *COCHE COMPARTIDO - SALDOS*\n`;
+          text += `Grupo: *${groupCode}*\n\n`;
+          members.forEach(m => {
+            const score = stats.balance[m.name] || 0;
+            const status = score >= 0 ? `+${score}` : `${score}`;
+            const stateIcon = m.active ? '🟢' : '⏸️ (Pausado)';
+            text += `${stateIcon} *${m.name}*: ${status} pts (Condujo ${stats.drivenCounts[m.name] || 0} veces)\n`;
+          });
+        } else if (type === 'agenda') {
+          text = `📅 *AGENDA SEMANAL DE COCHES*\n`;
+          text += `Grupo: *${groupCode}*\n\n`;
+          DAYS_OF_WEEK.forEach(day => {
+            text += `🔹 *${day}*:\n`;
+            ['Ida', 'Vuelta'].forEach(tramo => {
+              const key = `${day}_${tramo}`;
+              const groups = weeklyRoutines[key] || [];
+              if (groups.length > 0) {
+                const groupText = groups.map(g => `${g.name}: ${g.members.join(', ')}`).join(' | ');
+                text += `  • ${tramo}: ${groupText}\n`;
+              }
+            });
+          });
+        } else if (type === 'history') {
+          text = `📜 *ÚLTIMOS TRAYECTOS REGISTRADOS*\n`;
+          text += `Grupo: *${groupCode}*\n\n`;
+          trips.slice(0, 5).forEach(t => {
+            text += `• ${t.date} (${t.section}): *${t.driver}* (Conductor) con ${(t.passengers || []).join(', ')}\n`;
+          });
         }
-        document.body.removeChild(textArea);
+
+        // Try Native Share API on mobile devices, fallback to wa.me or clipboard
+        if (navigator.share) {
+          navigator.share({
+            title: 'Coche Compartido',
+            text: text
+          }).catch(() => {
+            window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+          });
+        } else {
+          // Open WhatsApp web/app directly
+          const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+          window.open(waUrl, '_blank');
+
+          // Fallback copy to clipboard
+          const textArea = document.createElement("textarea");
+          textArea.value = text;
+          document.body.appendChild(textArea);
+          textArea.select();
+          try {
+            document.execCommand('copy');
+            showToast("📋 Resumen copiado y listo para enviar en WhatsApp");
+          } catch (err) {}
+          document.body.removeChild(textArea);
+        }
       };
 
       return (
@@ -1715,12 +2038,14 @@
                 showToast("🔒 Modo MASTER bloqueado");
               } else {
                 setPendingTripToDelete(null);
+                setPendingMemberToDelete(null);
+                setPendingReset(false);
                 setInputPin('');
                 setPinError('');
                 setShowMasterModal(true);
               }
             }}
-            onShare={copyWhatsAppSummary}
+            onShare={() => shareViaWhatsApp('balance')}
           />
 
           <main className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1764,9 +2089,9 @@
             {activeTab === 'history' && (
               <HistoryTab
                 trips={trips}
-                isMasterUnlocked={isMasterUnlocked}
                 onRequestDeleteTrip={requestDeleteTrip}
                 onExportCSV={exportToCSV}
+                onShareWhatsApp={shareViaWhatsApp}
               />
             )}
 
@@ -1797,23 +2122,32 @@
                     showToast("🔒 Modo MASTER bloqueado");
                   } else {
                     setPendingTripToDelete(null);
+                    setPendingMemberToDelete(null);
+                    setPendingReset(false);
                     setInputPin('');
                     setPinError('');
                     setShowMasterModal(true);
                   }
                 }}
                 masterPin={masterPin}
+                onRequestResetPin={() => setShowResetPinModal(true)}
                 newPinInput={newPinInput}
                 setNewPinInput={setNewPinInput}
                 onChangeMasterPin={handleChangeMasterPin}
                 onExportCSV={exportToCSV}
-                onCopyWhatsApp={copyWhatsAppSummary}
+                onExportJSON={exportToJSON}
+                onImportJSON={importFromJSON}
+                onShareWhatsApp={shareViaWhatsApp}
                 onRequestReset={() => {
-                  if (!isMasterUnlocked) {
-                    showToast("🔒 Requiere PIN MASTER para reiniciar datos");
-                    setShowMasterModal(true);
-                  } else {
+                  if (isMasterUnlocked) {
                     setShowResetModal(true);
+                  } else {
+                    setPendingReset(true);
+                    setPendingTripToDelete(null);
+                    setPendingMemberToDelete(null);
+                    setInputPin('');
+                    setPinError('');
+                    setShowMasterModal(true);
                   }
                 }}
               />
@@ -1829,10 +2163,19 @@
             onClose={() => setShowMasterModal(false)}
           />
 
+          <ResetPinModal
+            show={showResetPinModal}
+            onConfirm={handleConfirmResetMasterPin}
+            onClose={() => setShowResetPinModal(false)}
+          />
+
           <ResetModal
             show={showResetModal}
             onConfirm={handleConfirmReset}
-            onClose={() => setShowResetModal(false)}
+            onClose={() => {
+              setShowResetModal(false);
+              setIsMasterUnlocked(false);
+            }}
           />
 
           <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
