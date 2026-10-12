@@ -120,7 +120,8 @@
         section: 'Ida',
         driver: 'Aurora',
         passengers: ['David', 'Germán', 'Gustavo'],
-        createdAt: '08:00'
+        createdAt: '08:00',
+        isDemo: true
       },
       {
         id: 't_demo_2',
@@ -128,7 +129,8 @@
         section: 'Vuelta',
         driver: 'Germán',
         passengers: ['Aurora', 'David', 'Gustavo'],
-        createdAt: '17:30'
+        createdAt: '17:30',
+        isDemo: true
       }
     ];
 
@@ -1377,6 +1379,11 @@
       const [activeTab, setActiveTab] = useState('balance');
       const [settingsSubTab, setSettingsSubTab] = useState('config');
 
+      // State versioning and timestamp
+      const [lastUpdated, setLastUpdated] = useState(() => {
+        return parseInt(localStorage.getItem('coche_last_updated_v1') || '0', 10) || Date.now();
+      });
+
       const [members, setMembers] = useState(() => {
         const saved = localStorage.getItem('coche_members_v6');
         return saved ? JSON.parse(saved) : INITIAL_MEMBERS;
@@ -1455,6 +1462,12 @@
         setTimeout(() => setToast(null), 4000);
       };
 
+      // Helper to check if current trips array only contains demo trips
+      const isOnlyDemoTrips = (tripsArr) => {
+        if (!tripsArr || tripsArr.length === 0) return false;
+        return tripsArr.every(t => t.isDemo || t.id.startsWith('t_demo_'));
+      };
+
       // Save to localStorage
       useEffect(() => {
         localStorage.setItem('coche_members_v6', JSON.stringify(members));
@@ -1462,7 +1475,8 @@
         localStorage.setItem('coche_weekly_routines_v7', JSON.stringify(weeklyRoutines));
         localStorage.setItem('coche_group_code', groupCode);
         localStorage.setItem('coche_master_pin', masterPin);
-      }, [members, trips, weeklyRoutines, groupCode, masterPin]);
+        localStorage.setItem('coche_last_updated_v1', lastUpdated.toString());
+      }, [members, trips, weeklyRoutines, groupCode, masterPin, lastUpdated]);
 
       // Real-Time Synchronization via Public MQTT WebSocket Relay
       useEffect(() => {
@@ -1497,7 +1511,8 @@
             
             client.publish(topic, JSON.stringify({
               type: 'REQUEST_SYNC',
-              senderId: clientId
+              senderId: clientId,
+              timestamp: Date.now()
             }));
           });
 
@@ -1507,24 +1522,45 @@
               if (payload.senderId === clientId) return;
 
               if (payload.type === 'SYNC_DATA') {
-                isRemoteUpdate.current = true;
-                if (payload.members) setMembers(payload.members);
-                if (payload.trips) setTrips(payload.trips);
-                if (payload.weeklyRoutines) setWeeklyRoutines(payload.weeklyRoutines);
-                showToast("⚡ Datos sincronizados en tiempo real");
-                setTimeout(() => { isRemoteUpdate.current = false; }, 300);
+                const remoteTime = payload.timestamp || 0;
+                const localTime = parseInt(localStorage.getItem('coche_last_updated_v1') || '0', 10);
+                const curT = JSON.parse(localStorage.getItem('coche_trips_v6') || '[]');
+
+                // PROTECTION: Ignore sync if incoming data contains demo trips while local has actual trips
+                const incomingIsDemo = isOnlyDemoTrips(payload.trips);
+                const localIsDemo = isOnlyDemoTrips(curT);
+
+                if (!localIsDemo && incomingIsDemo) {
+                  return; // Protect local real data from demo overwrite!
+                }
+
+                // Accept sync if remote is newer or has non-demo real content
+                if (remoteTime >= localTime || (localIsDemo && !incomingIsDemo)) {
+                  isRemoteUpdate.current = true;
+                  if (payload.members) setMembers(payload.members);
+                  if (payload.trips) setTrips(payload.trips);
+                  if (payload.weeklyRoutines) setWeeklyRoutines(payload.weeklyRoutines);
+                  if (payload.timestamp) setLastUpdated(payload.timestamp);
+                  showToast("⚡ Datos sincronizados en tiempo real");
+                  setTimeout(() => { isRemoteUpdate.current = false; }, 300);
+                }
               } else if (payload.type === 'REQUEST_SYNC') {
                 const curM = JSON.parse(localStorage.getItem('coche_members_v6') || '[]');
                 const curT = JSON.parse(localStorage.getItem('coche_trips_v6') || '[]');
                 const curR = JSON.parse(localStorage.getItem('coche_weekly_routines_v7') || '{}');
+                const curTime = parseInt(localStorage.getItem('coche_last_updated_v1') || '0', 10);
 
-                client.publish(topic, JSON.stringify({
-                  type: 'SYNC_DATA',
-                  senderId: clientId,
-                  members: curM,
-                  trips: curT,
-                  weeklyRoutines: curR
-                }));
+                // Only answer sync requests if we actually have user data or customized state
+                if (curM.length > 0) {
+                  client.publish(topic, JSON.stringify({
+                    type: 'SYNC_DATA',
+                    senderId: clientId,
+                    members: curM,
+                    trips: curT,
+                    weeklyRoutines: curR,
+                    timestamp: curTime
+                  }));
+                }
               }
             } catch (err) {
               console.error("Parse sync error:", err);
@@ -1552,10 +1588,13 @@
         const m = updatedMembers || members;
         const t = updatedTrips || trips;
         const r = updatedRoutines || weeklyRoutines;
+        const now = Date.now();
 
+        setLastUpdated(now);
         localStorage.setItem('coche_members_v6', JSON.stringify(m));
         localStorage.setItem('coche_trips_v6', JSON.stringify(t));
         localStorage.setItem('coche_weekly_routines_v7', JSON.stringify(r));
+        localStorage.setItem('coche_last_updated_v1', now.toString());
 
         const client = mqttClientRef.current;
         if (client && client.connected && groupCode) {
@@ -1568,7 +1607,7 @@
             members: m,
             trips: t,
             weeklyRoutines: r,
-            timestamp: Date.now()
+            timestamp: now
           }), { qos: 1 });
         }
       };
@@ -1785,7 +1824,8 @@
           section: tripSection,
           driver: driver,
           passengers: passengers,
-          createdAt: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+          createdAt: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+          isDemo: false
         };
 
         const updatedTrips = [newTripData, ...trips];
