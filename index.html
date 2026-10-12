@@ -21,6 +21,9 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <!-- MQTT.js for zero-config WebSocket real-time synchronization -->
+  <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -76,31 +79,9 @@
   <!-- Main Root Container -->
   <div id="root" class="h-full flex flex-col max-w-md mx-auto w-full bg-slate-900 shadow-2xl relative"></div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-    const defaultFirebaseConfig = {
-      apiKey: "AIzaSyD-demo-key-coche-compartido",
-      authDomain: "coche-compartido-app.firebaseapp.com",
-      projectId: "coche-compartido-pwa",
-      storageBucket: "coche-compartido-pwa.appspot.com",
-      messagingSenderId: "1029384756",
-      appId: "1:1029384756:web:abcdef123456"
-    };
-
-    try {
-      const app = initializeApp(defaultFirebaseConfig);
-      const db = getFirestore(app);
-      window.FirebaseSync = { db, doc, setDoc, onSnapshot, isAvailable: true };
-    } catch (e) {
-      console.warn("Firebase fall back to local storage mode:", e);
-      window.FirebaseSync = { isAvailable: false };
-    }
-  </script>
-
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef } = React;
+    const mqtt = window.mqtt;
 
     const INITIAL_MEMBERS = [
       { id: 'm1', name: 'Aurora', active: true, color: 'bg-blue-500' },
@@ -164,6 +145,14 @@
     };
 
     const Header = ({ isMasterUnlocked, syncStatus, groupCode, onOpenSettings, onToggleMaster, onShare }) => {
+      const getSyncLabel = () => {
+        if (syncStatus === 'connected') return { text: 'En línea', color: 'bg-emerald-400 animate-pulse' };
+        if (syncStatus === 'connecting') return { text: 'Conectando...', color: 'bg-amber-400 animate-ping' };
+        return { text: 'Modo Local', color: 'bg-slate-500' };
+      };
+
+      const sync = getSyncLabel();
+
       return (
         <header className="px-4 py-3 bg-slate-900 border-b border-slate-800/80 flex items-center justify-between shadow-lg shrink-0">
           <div className="flex items-center gap-2.5">
@@ -183,7 +172,7 @@
                 onClick={onOpenSettings}
                 className="text-[10px] text-slate-400 font-medium hover:text-sky-300 flex items-center gap-1 transition-colors mt-0.5"
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                <span className={`w-1.5 h-1.5 rounded-full ${sync.color}`}></span>
                 <span>Grupo: <strong className="text-slate-200 font-semibold">{groupCode}</strong></span>
                 <i className="fa-solid fa-gear text-[9px] ml-0.5 text-sky-400"></i>
               </button>
@@ -840,20 +829,17 @@
     const SettingsTab = ({
       settingsSubTab,
       setSettingsSubTab,
-      // Planner props
       weeklyRoutines,
       members,
       onAddGroup,
       onRemoveGroup,
       onToggleMemberInGroup,
-      // Members props
       newMemberName,
       setNewMemberName,
       onAddMember,
       onToggleMemberActive,
       onDeleteMember,
       stats,
-      // Config props
       syncStatus,
       tempGroupCode,
       setTempGroupCode,
@@ -871,7 +857,6 @@
     }) => {
       return (
         <div className="space-y-4">
-          {/* Sub-Navegación dentro de Ajustes */}
           <div className="flex bg-slate-900/90 p-1 rounded-2xl border border-slate-800 shadow-lg gap-1">
             <button
               type="button"
@@ -913,7 +898,6 @@
             </button>
           </div>
 
-          {/* Subpestaña: Equipo */}
           {settingsSubTab === 'members' && (
             <MembersTab
               members={members}
@@ -926,7 +910,6 @@
             />
           )}
 
-          {/* Subpestaña: Agenda */}
           {settingsSubTab === 'planner' && (
             <PlannerTab
               weeklyRoutines={weeklyRoutines}
@@ -937,27 +920,27 @@
             />
           )}
 
-          {/* Subpestaña: General / Configuración */}
           {settingsSubTab === 'config' && (
             <div className="space-y-4">
-              {/* Cloud Sync Settings */}
               <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-md space-y-3">
                 <h2 className="text-sm font-bold text-slate-100 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                   <span className="flex items-center gap-2">
-                    <i className="fa-solid fa-cloud text-sky-400"></i>
-                    Sincronización en la Nube
+                    <i className="fa-solid fa-wifi text-sky-400"></i>
+                    Sincronización en Tiempo Real
                   </span>
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
                     syncStatus === 'connected' 
                       ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' 
-                      : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : syncStatus === 'connecting'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
                   }`}>
-                    {syncStatus === 'connected' ? '● En línea' : '○ Modo Local'}
+                    {syncStatus === 'connected' ? '● En línea (Sincronizado)' : syncStatus === 'connecting' ? '🟡 Conectando...' : '○ Modo Local'}
                   </span>
                 </h2>
 
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Comparte el mismo código de grupo con tus compañeros para sincronizar turnos y saldos en tiempo real.
+                  Escribe el <strong>mismo código de grupo</strong> en los móviles de todos tus compañeros. Cualquier trayecto o cambio se actualizará en sus pantallas en tiempo real.
                 </p>
 
                 <div className="space-y-2">
@@ -968,7 +951,7 @@
                       value={tempGroupCode !== '' ? tempGroupCode : groupCode}
                       onChange={(e) => setTempGroupCode(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
                       className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-sky-300 font-mono font-bold focus:outline-none focus:border-sky-500"
-                      placeholder="ej: equipo-coche-1"
+                      placeholder="ej: equipo-coche-2026"
                     />
                     <button
                       type="button"
@@ -981,7 +964,6 @@
                 </div>
               </div>
 
-              {/* Security & Master PIN Settings */}
               <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-md space-y-3">
                 <h2 className="text-sm font-bold text-slate-100 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                   <span className="flex items-center gap-2">
@@ -1022,7 +1004,6 @@
                 </form>
               </div>
 
-              {/* Export & Sharing Tools */}
               <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800 shadow-md space-y-3">
                 <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
                   <i className="fa-solid fa-file-export text-emerald-400"></i>
@@ -1054,7 +1035,6 @@
                 </div>
               </div>
 
-              {/* Reset Data Section */}
               <div className="bg-slate-900 rounded-2xl p-4 border border-rose-500/30 shadow-md space-y-3">
                 <h2 className="text-sm font-bold text-rose-400 flex items-center gap-2 border-b border-slate-800/80 pb-2.5">
                   <i className="fa-solid fa-rotate-left"></i>
@@ -1191,7 +1171,7 @@
 
     function App() {
       const [activeTab, setActiveTab] = useState('balance');
-      const [settingsSubTab, setSettingsSubTab] = useState('config'); // 'members', 'planner', 'config'
+      const [settingsSubTab, setSettingsSubTab] = useState('config');
 
       const [members, setMembers] = useState(() => {
         const saved = localStorage.getItem('coche_members_v6');
@@ -1217,7 +1197,7 @@
       const [selectedDaySuggestion, setSelectedDaySuggestion] = useState(getTodayName());
       const [selectedSectionSuggestion, setSelectedSectionSuggestion] = useState('Ida');
 
-      // Admin / Master PIN State
+      // Security / Admin
       const [masterPin, setMasterPin] = useState(() => {
         return localStorage.getItem('coche_master_pin') || '1234';
       });
@@ -1229,18 +1209,18 @@
       const [pinError, setPinError] = useState('');
       const [newPinInput, setNewPinInput] = useState('');
 
-      // Group Sync State
+      // Group Sync State (WebSocket / MQTT)
       const [groupCode, setGroupCode] = useState(() => {
         return localStorage.getItem('coche_group_code') || 'equipo-coche-1';
       });
       const [tempGroupCode, setTempGroupCode] = useState('');
-      const [syncStatus, setSyncStatus] = useState('local');
+      const [syncStatus, setSyncStatus] = useState('connecting');
       const isRemoteUpdate = useRef(false);
+      const mqttClientRef = useRef(null);
 
       const [toast, setToast] = useState(null);
       const [showInactiveInBalance, setShowInactiveInBalance] = useState(false);
 
-      // Form state for new trip
       const todayStr = new Date().toISOString().split('T')[0];
       const [tripDate, setTripDate] = useState(todayStr);
       const [tripSection, setTripSection] = useState('Ida');
@@ -1265,6 +1245,7 @@
         setTimeout(() => setToast(null), 3200);
       };
 
+      // Save to localStorage
       useEffect(() => {
         localStorage.setItem('coche_members_v6', JSON.stringify(members));
         localStorage.setItem('coche_trips_v6', JSON.stringify(trips));
@@ -1273,53 +1254,117 @@
         localStorage.setItem('coche_master_pin', masterPin);
       }, [members, trips, weeklyRoutines, groupCode, masterPin]);
 
-      // Firebase Sync
+      // Real-Time Synchronization via Public MQTT WebSocket Relay
       useEffect(() => {
-        if (!groupCode || !window.FirebaseSync || !window.FirebaseSync.isAvailable) {
+        const cleanCode = groupCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        if (!cleanCode || !mqtt) {
           setSyncStatus('local');
           return;
         }
 
-        setSyncStatus('syncing');
-        const { db, doc, onSnapshot } = window.FirebaseSync;
-        const cleanCode = groupCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        const groupRef = doc(db, 'coche_groups', cleanCode);
+        setSyncStatus('connecting');
 
-        const unsubscribe = onSnapshot(groupRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data();
-            isRemoteUpdate.current = true;
-            if (data.members) setMembers(data.members);
-            if (data.trips) setTrips(data.trips);
-            if (data.weeklyRoutines) setWeeklyRoutines(data.weeklyRoutines);
-            setSyncStatus('connected');
-            setTimeout(() => { isRemoteUpdate.current = false; }, 300);
-          } else {
-            setSyncStatus('connected');
+        const topic = `coche_compartido_pwa_v2/${cleanCode}`;
+        const clientId = 'client_' + Math.random().toString(36).substring(2, 10);
+
+        try {
+          if (mqttClientRef.current) {
+            mqttClientRef.current.end(true);
           }
-        }, (err) => {
-          console.warn("Sync error:", err);
-          setSyncStatus('local');
-        });
 
-        return () => unsubscribe();
+          // Connecting to public SSL MQTT broker
+          const client = mqtt.connect('wss://broker.emqx.io:8084/mqtt', {
+            clientId,
+            clean: true,
+            connectTimeout: 8000,
+            reconnectPeriod: 4000
+          });
+
+          mqttClientRef.current = client;
+
+          client.on('connect', () => {
+            setSyncStatus('connected');
+            client.subscribe(topic, { qos: 1 });
+            
+            // Ask existing connected clients for their current state
+            client.publish(topic, JSON.stringify({
+              type: 'REQUEST_SYNC',
+              senderId: clientId
+            }));
+          });
+
+          client.on('message', (t, msg) => {
+            try {
+              const payload = JSON.parse(msg.toString());
+              if (payload.senderId === clientId) return;
+
+              if (payload.type === 'SYNC_DATA') {
+                isRemoteUpdate.current = true;
+                if (payload.members) setMembers(payload.members);
+                if (payload.trips) setTrips(payload.trips);
+                if (payload.weeklyRoutines) setWeeklyRoutines(payload.weeklyRoutines);
+                showToast("⚡ Datos sincronizados en tiempo real");
+                setTimeout(() => { isRemoteUpdate.current = false; }, 300);
+              } else if (payload.type === 'REQUEST_SYNC') {
+                const curM = JSON.parse(localStorage.getItem('coche_members_v6') || '[]');
+                const curT = JSON.parse(localStorage.getItem('coche_trips_v6') || '[]');
+                const curR = JSON.parse(localStorage.getItem('coche_weekly_routines_v7') || '{}');
+
+                client.publish(topic, JSON.stringify({
+                  type: 'SYNC_DATA',
+                  senderId: clientId,
+                  members: curM,
+                  trips: curT,
+                  weeklyRoutines: curR
+                }));
+              }
+            } catch (err) {
+              console.error("Parse sync error:", err);
+            }
+          });
+
+          client.on('offline', () => setSyncStatus('local'));
+          client.on('error', () => setSyncStatus('local'));
+
+        } catch (e) {
+          console.warn("MQTT init error:", e);
+          setSyncStatus('local');
+        }
+
+        return () => {
+          if (mqttClientRef.current) {
+            mqttClientRef.current.end(true);
+          }
+        };
       }, [groupCode]);
 
       const pushToCloud = (updatedMembers, updatedTrips, updatedRoutines) => {
-        if (isRemoteUpdate.current || !groupCode || !window.FirebaseSync || !window.FirebaseSync.isAvailable) return;
-        
-        const { db, doc, setDoc } = window.FirebaseSync;
-        const cleanCode = groupCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        const groupRef = doc(db, 'coche_groups', cleanCode);
+        if (isRemoteUpdate.current) return;
 
-        setDoc(groupRef, {
-          members: updatedMembers || members,
-          trips: updatedTrips || trips,
-          weeklyRoutines: updatedRoutines || weeklyRoutines,
-          updatedAt: new Date().toISOString()
-        }, { merge: true }).catch(err => {
-          console.warn("Cloud push error:", err);
-        });
+        const m = updatedMembers || members;
+        const t = updatedTrips || trips;
+        const r = updatedRoutines || weeklyRoutines;
+
+        // Save locally
+        localStorage.setItem('coche_members_v6', JSON.stringify(m));
+        localStorage.setItem('coche_trips_v6', JSON.stringify(t));
+        localStorage.setItem('coche_weekly_routines_v7', JSON.stringify(r));
+
+        // Broadcast change over WebSocket MQTT
+        const client = mqttClientRef.current;
+        if (client && client.connected && groupCode) {
+          const cleanCode = groupCode.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+          const topic = `coche_compartido_pwa_v2/${cleanCode}`;
+
+          client.publish(topic, JSON.stringify({
+            type: 'SYNC_DATA',
+            senderId: client.options.clientId,
+            members: m,
+            trips: t,
+            weeklyRoutines: r,
+            timestamp: Date.now()
+          }), { qos: 1 });
+        }
       };
 
       useEffect(() => {
